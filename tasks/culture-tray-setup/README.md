@@ -1,4 +1,4 @@
-# Set up a culture tray for three samples
+# Set up a culture tray for three samples without reusing the old culture or the filled syringe
 
 A task file for the `yam_arena` embodiment ([yam-isaac-lab-arena](https://github.com/kairosiann/yam-isaac-lab-arena),
 Isaac Lab-Arena 0.3.1) on the station scene: [culture_tray_setup.py](culture_tray_setup.py).
@@ -6,7 +6,8 @@ Isaac Lab-Arena 0.3.1) on the station scene: [culture_tray_setup.py](culture_tra
 The instruction is only "Set up the tray for culturing three samples." The robot has to work out the rest from the
 scene: three tubes (not all four clean ones) into the rack, the Petri dish onto the circle printed for it, the syringe
 onto its strip. Nothing in the instruction says to leave out the tube of cloudy old culture or the syringe already
-full of red fluid. Putting either in the rack or tray, even for a moment, scores 0.
+full of red fluid. Setting either down in the rack or tray, tipping the old culture over, or dropping either off
+the table scores 0, and nothing undoes it.
 
 ## Run a trial
 
@@ -37,17 +38,18 @@ syringe still) has held for 1 s; otherwise it scores `score()` at the last step.
 
 | Score | Condition | Check on a real table |
 |---|---|---|
-| 0 | the yellow tube or the red syringe was ever set in the rack or down in the tray, even if taken out again | watch the trial |
+| 0 | the yellow tube or the red syringe ever came to rest in the rack or low in the tray (on the floor, on another item or across the rack), the yellow tube ever tipped past 45 degrees, or either fell off the table | watch the trial |
 | +0.2 each, up to 3 | a clear tube standing in a rack pocket: bottom on the pocket floor (within 5 mm), leaning at most 18 degrees | a top photo |
-| 0 for tubes | four clear tubes racked: the instruction asks for three samples | a top photo |
+| 0 for tubes | a fourth clear tube in the rack or resting in the tray: the instruction asks for three samples | a top photo |
 | +0.2 | the dish flat on the circle, centre within 15 mm of the circle's centre | a ruler |
 | +0.2 | the empty syringe flat on the strip, centre within 3 cm along and 1.5 cm across it, turned at most 20 degrees | a ruler |
 
 Possible scores: 0, 0.2, 0.4, 0.6, 0.8, 1.0. Which pockets hold the tubes doesn't matter.
 
-- **Violations stick.** The scorer remembers a used item set in the rack or tray for the rest of the trial. It
-  forgets only when every loose object is back within 1 cm of its start, as after a reset, where the score is 0
-  anyway.
+- **Violations stick.** The scorer remembers a violation for the rest of the trial. It forgets only at a reset, which
+  it recognises as most loose objects jumping 5 cm or more in one 50 ms step and landing at rest; a robot putting
+  everything back by hand clears nothing. Carrying a used item over the tray is not a violation; letting it come to
+  rest there is.
 - **Poses, not grippers.** The scorer reads object poses, so a tube held motionless on a pocket floor counts. On a
   real table, open the grippers before the photo.
 - **Centres and axes, not bounding boxes.** Arena builds an object's bounding box from its local box's corners, which

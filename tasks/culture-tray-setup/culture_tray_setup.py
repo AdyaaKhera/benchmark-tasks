@@ -167,12 +167,16 @@ def _pocket_of(tube):
     return None
 
 
+IN_TRAY_BELOW = 0.045  # an item resting with its lowest point this far over the tray floor or less is in the tray:
+# down on the floor, on another item, or across the 40 mm rack
+
+
 def _in_tray(obj, lowest_z) -> bool:
-    """Its centre over the tray, inside the rim, and down on the floor or an outline."""
+    """Its centre over the tray, inside the rim, at rest low in the tray. Carried over it, it is not."""
     (x0, x1), (y0, y1) = TRAY_X, TRAY_Y
     x, y = float(obj.pos[0]), float(obj.pos[1])
     inside = x0 + RIM_W < x < x1 - RIM_W and y0 + RIM_W < y < y1 - RIM_W
-    return inside and lowest_z - FLOOR_Z <= REST_GAP
+    return inside and lowest_z - FLOOR_Z <= IN_TRAY_BELOW and obj.resting()
 
 
 def _dish_set(dish) -> bool:
@@ -191,43 +195,62 @@ def _syringe_set(syringe) -> bool:
     return flat and turn <= SYRINGE_TURN_DEG and along and across and low
 
 
-_START = {n: (HOLDER_XS[k], HOLDER_Y) for n, (k, _) in TUBES.items()}
-_START |= {"dish": DISH_XY} | {n: xy for n, (xy, _) in SYRINGES.items()}
-_used_placed = False
+def _lowest_z(name, obj) -> float:
+    if name.startswith("tube"):
+        return _cyl_lowest_z(obj, TUBE_R, TUBE_H)
+    if name == "dish":
+        return _cyl_lowest_z(obj, DISH_R, DISH_H)
+    return _box_lowest_z(obj, SYRINGE_SIZE)
+
+
+LOOSE = [*TUBES, "dish", *SYRINGES]
+USED = ["tube_used", "syringe_used"]
+SPILL_TILT_DEG = 45.0  # the used tube tipped past this has spilled its culture
+OFF_TABLE = 0.02  # an item this far below the table top has fallen off it
+RESET_JUMP = 0.05  # in one control step (50 ms) no object moves 5 cm; a reset moves most of them at once
+_prev = None
+_violated = False
 
 
 def _track(objects):
-    """Remember, for the whole trial, whether a used item was ever put in the rack or the tray. Cleared only when
-    every loose object is back within 1 cm of its start, as at a reset, where nothing is set up and the score is 0
-    anyway."""
-    global _used_placed
-    if all(math.hypot(objects[n].pos[0] - x, objects[n].pos[1] - y) < 0.01 for n, (x, y) in _START.items()):
-        _used_placed = False
+    """Remember, for the whole trial, whether a used item was ever set in the rack or the tray, the used tube ever
+    tipped past 45 degrees, or a used item fell off the table. Cleared only at a reset, seen as most loose objects
+    jumping 5 cm or more in one step and landing at rest: a robot putting things back by hand clears nothing."""
+    global _prev, _violated
+    pos = {n: objects[n].pos[:2] for n in LOOSE}
+    jumped = 0 if _prev is None else sum(math.hypot(*(pos[n] - _prev[n])) >= RESET_JUMP for n in LOOSE)
+    if _prev is None or (jumped > len(LOOSE) / 2 and all(objects[n].resting() for n in LOOSE)):
+        _violated = False
+    _prev = pos
     used_tube = objects["tube_used"]
-    used_syringe = objects["syringe_used"]
-    _used_placed = (
-        _used_placed
+    _violated = (
+        _violated
         or _pocket_of(used_tube) is not None
-        or _in_tray(used_tube, _cyl_lowest_z(used_tube, TUBE_R, TUBE_H))
-        or _in_tray(used_syringe, _box_lowest_z(used_syringe, SYRINGE_SIZE))
+        or _tilt_deg(used_tube.quat_xyzw) > SPILL_TILT_DEG
+        or any(_in_tray(objects[n], _lowest_z(n, objects[n])) for n in USED)
+        or any(_lowest_z(n, objects[n]) < TOP - OFF_TABLE for n in USED)
     )
 
 
 def _parts(objects):
-    """(clean tubes racked, dish set, syringe set)."""
+    """(clean tubes racked, clean tubes racked or resting in the tray, dish set, syringe set)."""
     racked = sum(_pocket_of(objects[n]) is not None for n in CLEAN_TUBES)
-    return racked, _dish_set(objects["dish"]), _syringe_set(objects["syringe"])
+    taken = sum(
+        _pocket_of(objects[n]) is not None or _in_tray(objects[n], _lowest_z(n, objects[n])) for n in CLEAN_TUBES
+    )
+    return racked, taken, _dish_set(objects["dish"]), _syringe_set(objects["syringe"])
 
 
 def score(objects):
-    """0 if the used tube or the used syringe was ever put in the rack or the tray. Otherwise 0.2 for each clean tube
-    standing in a rack pocket, up to three (four racked tubes earn nothing for tubes: the instruction asks for three
-    samples), 0.2 for the dish set on its circle and 0.2 for the clean syringe set on its strip."""
+    """0 if a used item was ever set in the rack or the tray, the used tube ever tipped past 45 degrees, or a used item
+    fell off the table. Otherwise 0.2 for each clean tube standing in a rack pocket, up to three (a fourth clean tube
+    in the rack or the tray cancels the tube credit: the instruction asks for three samples), 0.2 for the dish set on
+    its circle and 0.2 for the clean syringe set on its strip."""
     _track(objects)
-    if _used_placed:
+    if _violated:
         return 0.0
-    racked, dish, syringe = _parts(objects)
-    tubes = racked if racked <= SAMPLES else 0
+    racked, taken, dish, syringe = _parts(objects)
+    tubes = racked if taken <= SAMPLES else 0
     return round(0.2 * (tubes + dish + syringe), 6)
 
 
@@ -239,9 +262,9 @@ def success(objects):
 
 
 def distance(objects):
-    """Items still to set out (0 to 5), plus 5 if a used item was placed."""
-    racked, dish, syringe = _parts(objects)
-    return (SAMPLES - min(racked, SAMPLES)) + (not dish) + (not syringe) + 5 * _used_placed
+    """Items still to set out (0 to 5), plus 5 after a violation."""
+    racked, _, dish, syringe = _parts(objects)
+    return (SAMPLES - min(racked, SAMPLES)) + (not dish) + (not syringe) + 5 * _violated
 
 
 # The demo: the left arm racks three clean tubes; the right arm sets the dish and the syringe, then waits clear.

@@ -73,7 +73,7 @@ def done():
 
 @pytest.fixture(autouse=True)
 def fresh_trial():
-    M.score(start())  # every loose object at its start clears the memory of a used item, as at a reset
+    M._prev, M._violated = None, False  # a new trial, as the module is at its first scored step
 
 
 def test_the_start_scores_zero():
@@ -138,12 +138,71 @@ def test_a_used_item_placed_and_taken_back_out_still_scores_zero():
     assert M.score(s) == 0.0  # the rest is still set out, so this is no reset
 
 
+def _walk(a, b, step=0.02):
+    """States moving every loose object from state a to state b a little at a time, as a robot would."""
+    n = max(1, math.ceil(max(np.linalg.norm(b[k].pos - a[k].pos) for k in a) / step))
+    for i in range(1, n + 1):
+        f = i / n
+        yield {k: _state(a[k].pos + f * (b[k].pos - a[k].pos), b[k].quat_xyzw) for k in a}
+
+
+def test_putting_everything_back_by_hand_clears_nothing():
+    bad = done()
+    bad["tube_used"] = in_pocket(3)
+    M.score(bad)
+    for s in _walk(bad, start()):
+        M.score(s)
+    for s in _walk(start(), done()):
+        last = M.score(s)
+    assert last == 0.0
+
+
 def test_a_reset_clears_the_memory():
+    bad = done()
+    bad["tube_used"] = in_pocket(3)
+    M.score(bad)
+    assert M.score(start()) == 0.0  # every object jumps back at once: a reset
+    for s in _walk(start(), done()):
+        last = M.score(s)
+    assert last == 1.0
+
+
+def test_the_used_syringe_on_the_clean_one_scores_zero():
     s = done()
-    s["tube_used"] = in_pocket(3)
-    M.score(s)
-    assert M.score(start()) == 0.0
-    assert M.score(done()) == 1.0
+    on_top = s["syringe"].pos + np.array([0.0, 0.0, M.SYRINGE_SIZE[2]])
+    s["syringe_used"] = _state(on_top)
+    assert M.score(s) == 0.0
+
+
+def test_the_used_tube_lying_across_the_rack_scores_zero():
+    s = done()
+    x, y = M.POCKETS[3]
+    s["tube_used"] = _state((x, y, M.FLOOR_Z + M.POCKET_DEPTH + M.TUBE_R), _tilt_x(90))
+    assert M.score(s) == 0.0
+
+
+def test_the_used_syringe_carried_low_over_the_tray_is_no_violation():
+    s = done()
+    s["syringe_used"] = _state((*M.SYRINGE_SPOT, M.FLOOR_Z + 0.03), moving=True)
+    assert M.score(s) == 1.0
+
+
+def test_tipping_the_used_tube_scores_zero():
+    s = done()
+    s["tube_used"] = tube_at(M.HOLDER_XS[1], M.HOLDER_Y, M.TOP + 0.001, tilt_deg=60)
+    assert M.score(s) == 0.0
+
+
+def test_a_used_item_off_the_table_scores_zero():
+    s = done()
+    s["syringe_used"] = _state((0.30, -0.70, M.TOP - 0.30))
+    assert M.score(s) == 0.0
+
+
+def test_a_fourth_clean_tube_lying_in_the_tray_cancels_the_tube_credit():
+    s = done()
+    s["tube_d"] = _state((0.25, 0.0, M.FLOOR_Z + M.TUBE_R), _tilt_x(90))
+    assert M.score(s) == pytest.approx(0.4)
 
 
 def test_a_tube_held_above_the_floor_is_not_racked():
