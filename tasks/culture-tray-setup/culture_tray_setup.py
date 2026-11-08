@@ -272,6 +272,11 @@ GRIP_BELOW_TOP = 0.045  # a tube is gripped 4.5 cm below its top
 _TUBE_TCP_TO_BOTTOM = TUBE_H - GRIP_BELOW_TOP
 _TUBE_GRIP_Z = TOP + 0.001 + _TUBE_TCP_TO_BOTTOM
 _TUBE_CARRY_Z = FLOOR_Z + POCKET_DEPTH + 0.015 + _TUBE_TCP_TO_BOTTOM  # bottom 1.5 cm over the pocket rims
+# WHY: a carried tube swings a few degrees in the grip and runs up to 2 cm past its target. Carried diagonally to the
+# near left pocket, it ran into the tube in the far left one and fell (trace, 2026-11-08). Carrying it over the racked
+# tubes is out of reach, so each tube stops 8 cm short of its pocket, on the holders' side, and then moves slowly
+# straight in: any overshoot is along the approach, never sideways into a racked tube.
+STAGE_DY = 0.08
 _TUBE_SET_Z = FLOOR_Z + _TUBE_TCP_TO_BOTTOM
 _TUBE_CLEAR_Z = max(TOP + TUBE_H + PAD_TIP_PAST_TCP + 0.015, _TUBE_CARRY_Z)  # pads 1.5 cm over a standing tube
 # Pads 44 mm apart (0 is closed, FINGER_OPEN 94 mm): 7 mm each side of a 30 mm tube, and 13 mm short of a tube in
@@ -299,9 +304,11 @@ def _rack_tube(holder_x, pocket):
         Waypoint(1.5, (hx, hy, _TUBE_GRIP_Z), FINGER_OPEN, "down"),
         Waypoint(0.8, (hx, hy, _TUBE_GRIP_Z), TUBE_GRIP, "grip"),
         Waypoint(1.5, (hx, hy, _TUBE_CARRY_Z), TUBE_GRIP, "lift out of the holder"),
-        Waypoint(2.0, (px, py, _TUBE_CARRY_Z), TUBE_GRIP, "carry over the pocket"),
-        Waypoint(0.5, (px, py, _TUBE_CARRY_Z), TUBE_GRIP, "settle"),
-        Waypoint(2.0, (px, py, _TUBE_SET_Z), TUBE_GRIP, "lower into the pocket"),
+        Waypoint(2.0, (px, py + STAGE_DY, _TUBE_CARRY_Z), TUBE_GRIP, "carry to 8 cm short of the pocket"),
+        Waypoint(0.8, (px, py + STAGE_DY, _TUBE_CARRY_Z), TUBE_GRIP, "steady"),
+        Waypoint(2.0, (px, py, _TUBE_CARRY_Z), TUBE_GRIP, "slowly over the pocket"),
+        Waypoint(1.0, (px, py, _TUBE_CARRY_Z), TUBE_GRIP, "settle"),
+        Waypoint(3.0, (px, py, _TUBE_SET_Z), TUBE_GRIP, "lower into the pocket"),
         Waypoint(0.5, (px, py, _TUBE_SET_Z), TUBE_GRIP, "hold on the floor"),
         Waypoint(1.0, (px, py, _TUBE_SET_Z), FINGER_PART_OPEN, "let go"),
         Waypoint(0.8, (px, py, _TUBE_SET_Z), FINGER_PART_OPEN, "wait, fingers open"),
@@ -332,15 +339,21 @@ def _set_flat(start_xy, spot_xy, grip):
 
 
 RIGHT_PARK = (0.20, -0.30, _FLAT_TRAVEL_Z)  # over the right arm's side, clear of the tray
-TUBE_PLAN = (("tube_a", 2), ("tube_b", 0), ("tube_c", 1))  # far left, near left, near right
+# The near right pocket first: its straight-in approach crosses the near left pocket while that is still empty.
+TUBE_PLAN = (("tube_b", 1), ("tube_c", 0), ("tube_d", 2))
 
 
 def demo():
     """The right arm sets the dish on its circle and the empty syringe on its strip, then parks over its own side.
-    Meanwhile the left arm racks the nearest clean tube in the far left pocket, then the next two in the near pockets,
-    skipping the used tube. It leaves the far right pocket empty: at its corner of the tray the left arm is near the
-    edge of its reach."""
+    Then the left arm racks three clean tubes, skipping the used one: the middle tube in the near right pocket,
+    then the two farthest straight across into the near and far left pockets, so no tube is carried past one already
+    racked. It leaves the far right pocket empty: at its corner of the tray the left arm is near the edge of its
+    reach."""
     right = [*_set_flat(DISH_XY, DISH_SPOT, DISH_GRIP), *_set_flat(SYRINGES["syringe"][0], SYRINGE_SPOT, SYRINGE_GRIP)]
     right.append(Waypoint(1.5, RIGHT_PARK, FINGER_OPEN, "park clear of the tray"))
-    left = [w for name, k in TUBE_PLAN for w in _rack_tube(HOLDER_XS[TUBES[name][0]], k)]
+    right_s = sum(w.duration for w in right)
+    first = HOLDER_XS[TUBES[TUBE_PLAN[0][0]][0]]
+    # WHY: the near right pocket is 6 cm from the syringe strip, so the grippers would meet there.
+    left = [Waypoint(right_s, (first, HOLDER_Y, _TUBE_CLEAR_Z), FINGER_OPEN, "wait over the tubes for the right arm")]
+    left += [w for name, k in TUBE_PLAN for w in _rack_tube(HOLDER_XS[TUBES[name][0]], k)]
     return {"left": left, "right": right}
