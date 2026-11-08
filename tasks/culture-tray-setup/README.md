@@ -65,9 +65,27 @@ left arm is near the edge of its reach.
 
 ## Runtime and seeds
 
-- Scripted demo: TBD steps on an L40S.
-- Dream-1: 2,400 steps (2 minutes simulated), TBD minutes on an L40S.
-- `-E object_jitter=0` keeps the layout fixed, so no seed is needed.
+- Scripted demo: success at step 1,466 (73 s simulated); the run took 9.7 minutes on an RTX A6000 with frames stored.
+- Dream-1: 2,400 steps (2 minutes simulated); 21 minutes on an RTX A6000, including waits for Dream's session pool.
+- Isaac Sim's first start on a new machine takes about 5 minutes more.
+- `-E object_jitter=0` keeps the layout fixed, so no seed is needed (the logs record seed 0).
+
+## Submitted videos and scores
+
+- Dream-1 run: log `adhoc_87de390a.json`, trial `scene-0-e0`, `task_score = 0.0`, ended by `max_steps` after 2400
+  steps. Both arms went to the stock and hovered there; nothing was placed and no used item was moved.
+- Demo: log `adhoc_30ddd1b7.json`, trial `scene-0-e0`, `task_score = 1.0`, ended by `success` after 1466 steps.
+- Setup screenshot: frame 0 of the top camera, from the demo command with `-E cam_width=640 -E cam_height=360
+  --max-steps 1`.
+
+Videos were rendered with `inspect-robots video <log>` (one H.264 MP4 per camera; the uploaded file is the `top_cam`
+stream, re-encoded with `-c:v libx264 -pix_fmt yuv420p -movflags +faststart`) and the screenshot with
+`ffmpeg -y -i "<frames>/<trial>_top_cam.mp4" -frames:v 1 setup.png`. Both scored runs are at 320 x 176.
+
+## Reset between trials
+
+Nothing is consumed. Stand the five tubes back in their holders (the yellow one second from the arms), lay the dish
+and both syringes back on their marks, and empty the rack and the tray.
 
 ## Tests
 
