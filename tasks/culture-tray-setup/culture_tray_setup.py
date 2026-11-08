@@ -9,7 +9,7 @@ the arms. The tray, rack and holders are fixed; the tubes, dish and syringes are
 
 import math
 
-from yam_arena.constants import FINGER_CLOSED, FINGER_OPEN, PAD_TIP_PAST_TCP
+from yam_arena.constants import FINGER_OPEN, PAD_TIP_PAST_TCP
 from yam_arena.demo import Waypoint
 from yam_arena.task_file import TABLE_TOP, Box, Cylinder
 
@@ -232,8 +232,10 @@ def score(objects):
 
 
 def success(objects):
-    """Three clean tubes racked, the dish and syringe set, no used item ever placed; must hold for 1 s."""
-    return score(objects) == 1.0
+    """Three clean tubes racked, the dish and syringe set and still, no used item ever placed; must hold for 1 s. The
+    tubes need not be still: PhysX has no rolling resistance, so a released tube can rock in its pocket for seconds
+    (noted in the accepted centrifuge task)."""
+    return score(objects) == 1.0 and objects["dish"].resting() and objects["syringe"].resting()
 
 
 def distance(objects):
@@ -254,6 +256,16 @@ _TUBE_CLEAR_Z = max(TOP + TUBE_H + PAD_TIP_PAST_TCP + 0.015, _TUBE_CARRY_Z)  # p
 FINGER_PART_OPEN = FINGER_OPEN * 44 / 94
 
 
+def _grip(width):
+    """The finger target that closes the pads to 8 mm narrower than a part ``width`` m across: each finger then pushes
+    without saturating, and the pair centres the part. Fully shut, the fingers saturate and a part can slide onto one
+    (noted in the accepted fragile-stow task)."""
+    return FINGER_OPEN * max(0.0, width - 0.008) / 0.094
+
+
+TUBE_GRIP, DISH_GRIP, SYRINGE_GRIP = _grip(2 * TUBE_R), _grip(2 * DISH_R), _grip(SYRINGE_SIZE[1])
+
+
 def _rack_tube(holder_x, pocket):
     """Grip the tube in a holder (fingers across world y), lift it out, carry it over a pocket, lower it onto the
     pocket floor, let go and go back up. Over the rack the fingers open only part way: fully open, one would come
@@ -262,12 +274,12 @@ def _rack_tube(holder_x, pocket):
     return [
         Waypoint(1.5, (hx, hy, _TUBE_CLEAR_Z), FINGER_OPEN, "over the tube"),
         Waypoint(1.5, (hx, hy, _TUBE_GRIP_Z), FINGER_OPEN, "down"),
-        Waypoint(0.8, (hx, hy, _TUBE_GRIP_Z), FINGER_CLOSED, "grip"),
-        Waypoint(1.5, (hx, hy, _TUBE_CARRY_Z), FINGER_CLOSED, "lift out of the holder"),
-        Waypoint(2.0, (px, py, _TUBE_CARRY_Z), FINGER_CLOSED, "carry over the pocket"),
-        Waypoint(0.5, (px, py, _TUBE_CARRY_Z), FINGER_CLOSED, "settle"),
-        Waypoint(2.0, (px, py, _TUBE_SET_Z), FINGER_CLOSED, "lower into the pocket"),
-        Waypoint(0.5, (px, py, _TUBE_SET_Z), FINGER_CLOSED, "hold on the floor"),
+        Waypoint(0.8, (hx, hy, _TUBE_GRIP_Z), TUBE_GRIP, "grip"),
+        Waypoint(1.5, (hx, hy, _TUBE_CARRY_Z), TUBE_GRIP, "lift out of the holder"),
+        Waypoint(2.0, (px, py, _TUBE_CARRY_Z), TUBE_GRIP, "carry over the pocket"),
+        Waypoint(0.5, (px, py, _TUBE_CARRY_Z), TUBE_GRIP, "settle"),
+        Waypoint(2.0, (px, py, _TUBE_SET_Z), TUBE_GRIP, "lower into the pocket"),
+        Waypoint(0.5, (px, py, _TUBE_SET_Z), TUBE_GRIP, "hold on the floor"),
         Waypoint(1.0, (px, py, _TUBE_SET_Z), FINGER_PART_OPEN, "let go"),
         Waypoint(0.8, (px, py, _TUBE_SET_Z), FINGER_PART_OPEN, "wait, fingers open"),
         Waypoint(1.0, (px, py, _TUBE_CLEAR_Z), FINGER_PART_OPEN, "up"),
@@ -278,7 +290,7 @@ FLAT_GRIP_ABOVE_TABLE = 0.016  # the TCP this far above the surface: pad tips 3 
 _FLAT_TRAVEL_Z = TOP + 0.12
 
 
-def _set_flat(start_xy, spot_xy):
+def _set_flat(start_xy, spot_xy, grip):
     """Pick a flat-lying dish or syringe (fingers across world y) and set it down on its outline."""
     (sx, sy), (px, py) = start_xy, spot_xy
     grip_z = TOP + FLAT_GRIP_ABOVE_TABLE
@@ -286,10 +298,11 @@ def _set_flat(start_xy, spot_xy):
     return [
         Waypoint(1.5, (sx, sy, _FLAT_TRAVEL_Z), FINGER_OPEN, "over it"),
         Waypoint(1.5, (sx, sy, grip_z), FINGER_OPEN, "down"),
-        Waypoint(0.8, (sx, sy, grip_z), FINGER_CLOSED, "grip"),
-        Waypoint(1.2, (sx, sy, _FLAT_TRAVEL_Z), FINGER_CLOSED, "lift"),
-        Waypoint(2.0, (px, py, _FLAT_TRAVEL_Z), FINGER_CLOSED, "carry over the tray"),
-        Waypoint(1.5, (px, py, set_z), FINGER_CLOSED, "lower onto the outline"),
+        Waypoint(0.8, (sx, sy, grip_z), grip, "grip"),
+        Waypoint(1.2, (sx, sy, _FLAT_TRAVEL_Z), grip, "lift"),
+        Waypoint(2.0, (px, py, _FLAT_TRAVEL_Z), grip, "carry over the tray"),
+        Waypoint(1.5, (px, py, set_z + 0.01), grip, "lower to just over the outline"),
+        Waypoint(1.0, (px, py, set_z), grip, "set down slowly"),
         Waypoint(0.8, (px, py, set_z), FINGER_OPEN, "let go"),
         Waypoint(1.0, (px, py, _FLAT_TRAVEL_Z), FINGER_OPEN, "up"),
     ]
@@ -304,7 +317,7 @@ def demo():
     Meanwhile the left arm racks the nearest clean tube in the far left pocket, then the next two in the near pockets,
     skipping the used tube. It leaves the far right pocket empty: at its corner of the tray the left arm is near the
     edge of its reach."""
-    right = [*_set_flat(DISH_XY, DISH_SPOT), *_set_flat(SYRINGES["syringe"][0], SYRINGE_SPOT)]
+    right = [*_set_flat(DISH_XY, DISH_SPOT, DISH_GRIP), *_set_flat(SYRINGES["syringe"][0], SYRINGE_SPOT, SYRINGE_GRIP)]
     right.append(Waypoint(1.5, RIGHT_PARK, FINGER_OPEN, "park clear of the tray"))
     left = [w for name, k in TUBE_PLAN for w in _rack_tube(HOLDER_XS[TUBES[name][0]], k)]
     return {"left": left, "right": right}

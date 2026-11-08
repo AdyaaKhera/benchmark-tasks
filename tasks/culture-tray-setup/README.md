@@ -30,8 +30,8 @@ inspect-robots run --embodiment yam_arena --policy yam_scripted \
 for log in ~/yam-eval/culture-tray-*/*.json; do inspect-robots video "$log"; done
 ```
 
-The run prints `task_score` at the end. The trial ends with 1.0 once `success()` has held for 1 s; otherwise it
-scores `score()` at the last step.
+The run prints `task_score` at the end. The trial ends with 1.0 once `success()` (a full score with the dish and
+syringe still) has held for 1 s; otherwise it scores `score()` at the last step.
 
 ## Scoring
 

@@ -84,6 +84,12 @@ def test_the_full_setup_is_success():
     assert M.score(done()) == 1.0 and M.success(done())
 
 
+def test_a_dish_still_sliding_is_not_yet_success():
+    s = done()
+    s["dish"] = _state(s["dish"].pos, moving=True)
+    assert M.score(s) == 1.0 and not M.success(s)
+
+
 @pytest.mark.parametrize("racked", [0, 1, 2, 3])
 def test_each_racked_tube_earns_a_fifth(racked):
     s = start()
