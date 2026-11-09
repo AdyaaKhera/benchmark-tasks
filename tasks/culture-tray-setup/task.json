@@ -15,5 +15,6 @@
   "run_limit": "2,400 steps (2 minutes at 20 Hz)",
   "reset_notes": "Stand the tubes back in their holders (the yellow one second from the arms), and lay the dish and syringes back on their marks.",
   "fidelity": "Approximate: tubes, dish and syringes are plain cylinders and boxes, colored to show clear or full, with no liquid. All objects share one rubber-like friction (1.2). The scorer reads object poses, not the grippers, so a tube held still on a pocket floor counts; on a real table, open the grippers before checking.",
-  "scores": "Dream-1 run: 0.0; demo: 1.0"
+  "scores": "Dream-1 run: 0.0; demo: 1.0",
+  "media": "M-XAR5BR"
 }
