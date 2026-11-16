@@ -11,10 +11,10 @@ meshes in [assets/](assets).
 A finished print stands on a 3D printer's bed: an orange crank link (two 28 mm bosses joined by a bar, one boss on the
 bed and the other on top of the bar's far end) with four tree supports printed under its bar and under its top boss's
 rim. The robot takes the print off the printer, removes every support into the white bin, and puts the part in the
-blue tray. Each support is held to the part by its tips: a straight pull of up to 15 N (60 times the part's weight)
-only drags the part along, while a twist or rock of 0.10 N m breaks it off. So one hand has to hold the part while the
-other grips each support and twists or rocks it, reaching each from a different side; the last one sits behind the
-raised boss, out of reach until the part is turned.
+blue tray. Each support is held to the part by its tips. In the simulation a support holds a straight pull of up to
+15 N (60 times the part's weight) but breaks off when bent with 0.10 N m (estimated values: see the calibration below).
+So one hand has to hold the part while the other takes each support and bends it off, reaching each from a different
+side; the last one sits behind the raised boss, out of reach until the part is turned.
 
 ## Run a trial
 
@@ -49,9 +49,10 @@ The run prints `task_score` at the end. Scoring: `score()` in the task file and 
 
 Right arm: pinches the flat bar from above (flat faces, so the part can't spin in the grip), lifts the print off
 the bed (its supports come with it) and holds it 15 cm over the scrap bin beside the bed. Left arm: for each support,
-a forward grip on its trunk 4 mm above its foot (fingers pointing forward, closing sideways) (fingers part open: enough to clear the support's own branches but not
-its neighbours or the down boss), bend it about its top 12 degrees each way, twice, until it snaps, pull it down clear
-of the part and open: it drops into the bin. Before the last support, which sits behind the bar, the right wrist turns the
+a forward grip (fingers pointing forward, closing sideways) on its trunk 4 mm above its foot, the fingers opened just
+enough to clear the support's own branches and not its neighbours or the down boss; bend it about its top 12 degrees
+each way, twice, until it snaps, pull it down clear of the part and open: it drops into the bin. Before the last
+support, which sits behind the raised boss, the right wrist turns the
 part 60 degrees and slides it 4.5 cm toward the middle, bringing that support to the front and the arms apart. Then
 the right arm sets the part in the tray and lets go. The plan is 51.5 s; success holds from about 52 s (1,034
 steps).
@@ -87,7 +88,7 @@ steps).
 ## Runtime and seeds
 
 - Demo: about 52 s simulated (1,034 steps to success); a run takes about 3 minutes on an L40S.
-- Dream-1: 2,400 steps (2 minutes simulated); wall time not measured yet.
+- Dream-1: 2,400 steps (2 minutes simulated); about 6 minutes on an L40S.
 - `object_jitter=0` keeps the layout fixed, so no seed is needed.
 
 ## Checks without the simulator
@@ -108,4 +109,5 @@ need yam_arena but not Isaac Sim, and run without pytest too.
   coloured as the stock printer, the bed carriage moved to the front of its travel and the X gantry raised 10 cm,
   pieces under 8 mm (screws, nuts) dropped, and the mesh simplified to about 54,000 triangles. The modified file is
   distributed under the same licence.
-- `assets/crank.stl`, `assets/crank.usda`, `assets/support_*.usda`, `assets/make_print.py`: made for this task.
+- `assets/crank.stl`, `assets/crank_with_supports.stl`, `assets/crank.usda`, `assets/support_*.usda`,
+  `assets/make_print.py`: made for this task.
