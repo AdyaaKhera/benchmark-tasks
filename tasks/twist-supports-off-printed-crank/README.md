@@ -1,4 +1,4 @@
-# Hold a printed robot part over a scrap bin and bend its four tree supports off, one by one
+# Remove the tree supports from a 3D-printed robot part, holding it over a scrap bin
 
 A task file for the `yam_arena` embodiment ([yam-isaac-lab-arena](https://github.com/kairosiann/yam-isaac-lab-arena),
 Isaac Lab-Arena 0.3.1) on the station scene: [twist_supports_off_printed_crank.py](twist_supports_off_printed_crank.py).
